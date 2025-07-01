@@ -620,18 +620,27 @@
        "map-failure"
        {:error/message "map-failure", ::level :warn}]))
 
-  (testing ":fn with :error/path #554"
-    (is (= {:password2 ["passwords don't match"]}
-           (-> [:and [:map
-                      [:password string?]
-                      [:password2 string?]]
-                [:fn {:error/message "passwords don't match"
-                      :error/path [:password2]}
-                 '(fn [{:keys [password password2]}]
-                    (= password password2))]]
-               (m/explain {:password "secret"
-                           :password2 "faarao"})
-               (me/humanize {:resolve me/-resolve-root-error})))))
+  (testing ":fn with dynamic :error/path"
+    (let [schema [:and
+                  [:map
+                   [:password string?]
+                   [:password2 string?]]
+                  [:fn {:error/message "passwords don't match"
+                        :error/path (fn [{:keys [data]}]
+                                      (if (contains? data :password2)
+                                        [:password2]
+                                        [:password]))}
+                   (fn [{:keys [password password2]}]
+                     (= password password2))]]]
+      (is (= {:password2 ["passwords don't match"]}
+             (-> schema
+                 (m/explain {:password "secret"
+                             :password2 "faarao"})
+                 (me/humanize))))
+      (is (= {:password ["passwords don't match"]}
+             (-> schema
+                 (m/explain {:password "secret"})
+                 (me/humanize))))))
 
   (testing "refs #1106"
     (is (= {:foo ["should be an integer"]}

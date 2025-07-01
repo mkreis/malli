@@ -2022,11 +2022,27 @@
                 (if (not (fn? x))
                   (conj acc (miu/-error path in this x))
                   (if-let [res (checker x)]
-                    (conj acc (assoc (miu/-error path in this x) :check res))
+                    (let [error-path-prop (:error/path properties)
+                          error-path (cond
+                                       (fn? error-path-prop)
+                                       (let [result (error-path-prop {:data x :path path :in in :schema this})]
+                                         (if (vector? result) result path))
+                                       (sequential? error-path-prop) error-path-prop
+                                       :else nil)]
+                      (conj acc (assoc (miu/-error (or error-path path) in this x) :check res)))
                     acc)))
               (let [validator (-validator this)]
                 (fn explain [x in acc]
-                  (if-not (validator x) (conj acc (miu/-error path in this x)) acc)))))
+                  (if-not (validator x)
+                    (let [error-path-prop (:error/path properties)
+                          error-path (cond
+                                       (fn? error-path-prop)
+                                       (let [result (error-path-prop {:data x :path path :in in :schema this})]
+                                         (if (vector? result) result path))
+                                       (sequential? error-path-prop) error-path-prop
+                                       :else nil)]
+                      (conj acc (miu/-error (or error-path path) in this x)))
+                    acc)))))
           (-parser [this]
             (let [validator (-validator this)]
               (fn [x] (if (validator x) x ::invalid))))
